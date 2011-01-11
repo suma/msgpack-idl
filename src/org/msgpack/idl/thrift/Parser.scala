@@ -11,7 +11,8 @@ class Parser  extends StdTokenParsers with ImplicitConversions {
 	val lexical = new Tokens
 	import lexical.{NumericLit, Keyword, Identifier}
 
-	lexical.reserved ++= List(":", ";", "{", "}", "<", ">",
+	private val envMap = new HashMap[String, NodeType]
+	lexical.reserved ++= List(
 		"struct", "namespace", "required", "optional",
 		"string", "i8", "i32", "i64", "double", "list"
 	)
@@ -25,35 +26,56 @@ class Parser  extends StdTokenParsers with ImplicitConversions {
 		("double", TypeDouble()),
 		("string", TypeString())
 	)
-	private val envMap = new HashMap[String, NodeType]
 	typeConv.foreach(envMap += _)
 
-	def idl =  rep(idl_nodes) // ^^ { case nodes => ThriftIDL(nodes) }
-	def idl_nodes = (namespace | struct)
+	private var defined = List[IDLDefinition]()
 
-	def namespace: Parser[Any] = "namespace" ~ ident ~ ident
+	def idl =  rep(idl_nodes) ^^ { case nodes => ThriftIDL(nodes) }
+	def idl_nodes = (namespace | struct) ^^ {
+		case (idl: IDLDefinition) =>
+			idl
+	}
 
-	def struct: Parser[Any] = ("struct" ~
-					(ident ^^ {case s => envMap.put(s, TypeSymbol(s))})
-					~ "{" ~ rep(member) ~ "}")
+	def namespace: Parser[Any] = "namespace" ~ ident ~ ident ^^ {
+		case _ ~ lang ~ space =>
+			IDLNamespace(lang, space)
+	}
 
-	def member: Parser[Any] = numericLit ~ ":" ~ optional ~ typ ~ ident ~ ";"
+	def struct: Parser[Any] =
+		("struct" ~ (ident ^^ {case s => envMap.put(s, TypeSymbol(s)); s })
+					~ "{" ~ rep(member) ~ "}" ) ^^ {
+		case name ~ _ ~ (members: List[NodeElement]) ~ _ =>
+			IDLStruct(name._2, members)
+	}
 
-	def optional: Parser[Any] = ("optional" | "required")
+	def member: Parser[Any] = lNumber ~ ":" ~ required ~ typ ~ ident ~ ";" ^^ {
+		case num ~ (req: Boolean) ~ (typ: NodeType) ~ name ~ _ =>
+			/*
+			println("num: " + num._1)
+			println("req: " + req)
+			println("typ: " + typ)
+			println("name: " + name)
+			*/
+			NodeElement(num._1, name, typ, req)
+	}
+
+	def lNumber = accept("number", { case NumericLit(n) => n.toInt })
+
+	def required: Parser[Any] =
+		"required" ^^ { case _ => true } |
+		"optional" ^^ { case _ => false }
 
 	def typ: Parser[Any] = (
 			("i8" | "i16" | "i32" | "i64" | "double" | "string") ^^ {
 				case s: String =>
-					println("dbg type = " + s)
 					types(s)
 			} |
-			list | ident
+			list |
+			ident ^^ { case s => types(s) }
 			)
 
 	def list: Parser[Any] = ("list" ~ "<" ~ ident ~ ">") ^^ {
 		case _ ~ _ ~ indent ~ _ =>
-			println("hogehoge")
-			println("dbug " + indent)
 			TypeList(types(indent))
 	}
 
@@ -66,11 +88,12 @@ class Parser  extends StdTokenParsers with ImplicitConversions {
 	}
 
 	def parse(input: String) {
-		val tokens = new lexical.Scanner(input)
-		phrase(idl)(tokens) match {
+		val token = new lexical.Scanner(input)
+		phrase(idl)(token) match {
 			case Success(idlNode, _) =>
-				//initTop
-				println(idlNode)
+				println("== definitions")
+				idlNode.defs.foreach(p => println(p))
+				println("== registered symbols")
 				envMap.foreach(p => println(p))
 			case e =>
 				error(e.toString)
@@ -79,21 +102,3 @@ class Parser  extends StdTokenParsers with ImplicitConversions {
 
 }
 
-/*
-class Parser extends JavaTokenParsers {
-	//def value: Parser[Any] = decimalNumber | "struct" | "required" | "optional"
-	def idl: Parser[Any] = rep(namespace | struct)
-
-	def namespace: Parser[Any] = ident~ident
-	def struct: Parser[Any] = "struct" ~ ident ~ "{" ~ repsep(member, ";") ~ "}"
-	def member: Parser[Any] = wholeNumber ~ ":" ~ optional ~ typ ~ ident
-
-	def optional: Parser[Any] = "optional" | "required"
-
-	def typ: Parser[Any] =
-		"list"~"<" ~ ident ~ ">" |
-		"i32" | "i64" | "double" | "string"
-
-
-}
-*/

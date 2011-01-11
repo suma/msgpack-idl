@@ -1,11 +1,8 @@
 package org.msgpack.idl.thrift
 
 import scala.util.parsing.combinator._
-import scala.util.parsing.combinator.syntactical._
 import scala.util.parsing.combinator.lexical._
 import scala.util.parsing.input.CharArrayReader.EofCh
-import scala.util.parsing.combinator.token.StdTokens
-import scala.util.parsing.combinator.token.Tokens
 
 
 class Lexer extends StdLexical with ImplicitConversions {
@@ -23,11 +20,13 @@ class Lexer extends StdLexical with ImplicitConversions {
 	delimiters ++= List(">")
 
 	def addSymbol(xs: Elem) = {
+		//println("symbol " + xs)
 		Keyword(xs.toString)
 	}
 
 	def checkKeyword(xs: List[Any]) = {
 		val strRep = mkS(xs)
+		//println("keyword " + strRep)
 		if (reserved contains strRep) {
 			Keyword(strRep)
 		} else if (identifierRe.findFirstIn(strRep) != None) {
