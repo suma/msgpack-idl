@@ -18,15 +18,16 @@ class Parser  extends StdTokenParsers with ImplicitConversions {
 	)
 	lexical.delimiters ++= List("\n", "\r", " ", "\t")
 
-	private val typeConv = Array[(String, NodeType)](
+	// Create string to TypeClass map
+	Array[(String, NodeType)](
 		("i8", TypeInt8()),
 		("i16", TypeInt16()),
 		("i32", TypeInt32()),
 		("i64", TypeInt64()),
+		("bool", TypeBoolean()),
 		("double", TypeDouble()),
 		("string", TypeString())
-	)
-	typeConv.foreach(envMap += _)
+	).foreach(envMap += _)
 
 	private var defined = List[IDLDefinition]()
 
@@ -50,12 +51,6 @@ class Parser  extends StdTokenParsers with ImplicitConversions {
 
 	def member: Parser[Any] = lNumber ~ ":" ~ required ~ typ ~ ident ~ ";" ^^ {
 		case num ~ (req: Boolean) ~ (typ: NodeType) ~ name ~ _ =>
-			/*
-			println("num: " + num._1)
-			println("req: " + req)
-			println("typ: " + typ)
-			println("name: " + name)
-			*/
 			NodeElement(num._1, name, typ, req)
 	}
 
