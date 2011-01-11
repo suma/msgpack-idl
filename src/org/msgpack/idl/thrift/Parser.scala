@@ -45,13 +45,13 @@ class Parser  extends StdTokenParsers with ImplicitConversions {
 	def struct: Parser[Any] =
 		("struct" ~ (ident ^^ {case s => envMap.put(s, TypeSymbol(s)); s })
 					~ "{" ~ rep(member) ~ "}" ) ^^ {
-		case name ~ _ ~ (members: List[NodeElement]) ~ _ =>
+		case name ~ _ ~ (members: List[StructMember]) ~ _ =>
 			IDLStruct(name._2, members)
 	}
 
 	def member: Parser[Any] = lNumber ~ ":" ~ required ~ typ ~ ident ~ ";" ^^ {
 		case num ~ (req: Boolean) ~ (typ: NodeType) ~ name ~ _ =>
-			NodeElement(num._1, name, typ, req)
+			StructMember(num._1, name, typ, req)
 	}
 
 	def lNumber = accept("number", { case NumericLit(n) => n.toInt })
