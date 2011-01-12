@@ -2,7 +2,6 @@ package org.msgpack.idl.thrift
 
 import org.msgpack.idl.ast._
 
-case class TypeList(typ: NodeType) extends NodeType
 
 case class StructMember(index: Int, name: String, typ: NodeType, required: Boolean)
 

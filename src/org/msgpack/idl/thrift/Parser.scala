@@ -1,7 +1,7 @@
 package org.msgpack.idl.thrift
 
 import util.parsing.combinator.syntactical.StdTokenParsers
-import util.parsing.combinator.{JavaTokenParsers, ImplicitConversions}
+import util.parsing.combinator.ImplicitConversions
 import org.msgpack.idl.ast._
 import scala.collection.mutable.HashMap
 
@@ -9,16 +9,19 @@ import scala.collection.mutable.HashMap
 class Parser  extends StdTokenParsers with ImplicitConversions {
 	type Tokens = Lexer
 	val lexical = new Tokens
-	import lexical.{NumericLit, Keyword, Identifier}
+	import lexical.NumericLit
 
-	private val envMap = new HashMap[String, NodeType]
+	private val symbolTable = new HashMap[String, NodeType]
+
+	// FIXME: replace StdLexer.Keyword to original tokens
 	lexical.reserved ++= List(
 		"struct", "namespace", "required", "optional",
-		"string", "i8", "i32", "i64", "double", "list"
+		"string", "i8", "16", "i32", "i64", "double", "list"
 	)
 	lexical.delimiters ++= List("\n", "\r", " ", "\t")
 
-	// Create string to TypeClass map
+	// Create token to TypeClass map
+	// FIXME: replace StdLexer.Keyword to original tokens
 	Array[(String, NodeType)](
 		("i8", TypeInt8()),
 		("i16", TypeInt16()),
@@ -27,9 +30,7 @@ class Parser  extends StdTokenParsers with ImplicitConversions {
 		("bool", TypeBoolean()),
 		("double", TypeDouble()),
 		("string", TypeString())
-	).foreach(envMap += _)
-
-	private var defined = List[IDLDefinition]()
+	).foreach(symbolTable += _)
 
 	def idl =  rep(idl_nodes) ^^ { case nodes => ThriftIDL(nodes) }
 	def idl_nodes = (namespace | struct) ^^ {
@@ -43,7 +44,7 @@ class Parser  extends StdTokenParsers with ImplicitConversions {
 	}
 
 	def struct: Parser[Any] =
-		("struct" ~ (ident ^^ {case s => envMap.put(s, TypeSymbol(s)); s })
+		("struct" ~ (ident ^^ {case s => symbolTable.put(s, TypeSymbol(s)); s })
 					~ "{" ~ rep(member) ~ "}" ) ^^ {
 		case name ~ _ ~ (members: List[StructMember]) ~ _ =>
 			IDLStruct(name._2, members)
@@ -75,7 +76,7 @@ class Parser  extends StdTokenParsers with ImplicitConversions {
 	}
 
 	private def types(s: String): NodeType = {
-		envMap.get(s) match {
+		symbolTable.get(s) match {
 			case Some(t) => t
 			case None =>
 				throw new Exception("Symbol not found " + s)
@@ -89,11 +90,10 @@ class Parser  extends StdTokenParsers with ImplicitConversions {
 				println("== definitions")
 				idlNode.defs.foreach(p => println(p))
 				println("== registered symbols")
-				envMap.foreach(p => println(p))
+				symbolTable.foreach(p => println(p))
 			case e =>
 				error(e.toString)
 		}
 	}
-
 }
 
